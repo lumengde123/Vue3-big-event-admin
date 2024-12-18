@@ -2,12 +2,14 @@
 import { Delete, Edit} from '@element-plus/icons-vue'
 import { ref } from 'vue'
 import ChannelSelect from './components/ChannelSelect.vue'
-import { artGetListService } from '@/api/article'
+import ArticleEdit from './components/ArticleEdit.vue'
+import { artGetListService, artDelService } from '@/api/article'
 import { formatTime } from '@/utils/format'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 const articleList = ref([]) // 文章列表
 const total = ref(0)  // 总条数
-const loading = ref(false)
+const loading = ref(false)  // 控制loading显示隐藏
 
 // 定义请求参数对象
 const params = ref({
@@ -50,6 +52,7 @@ const onSizeChange = (size) => {
   // 基于最新的当前页 和 每页条数，渲染数据
   getArticleList()
 }
+
 const onCurrentChange = page => {
   // 更新当前页
   params.value.pagenum = page
@@ -57,14 +60,38 @@ const onCurrentChange = page => {
   getArticleList()
 }
 
+const articleEditRef = ref() // 给抽屉传参
+// 添加逻辑
+const onAddArticle = () => {
+  articleEditRef.value.open({})
+}
+
 // 编辑逻辑
 const onEditArticle = (row) => {
-  console.log(row)
+  articleEditRef.value.open(row)
 }
 
 // 删除逻辑
-const onDeleteArticle = (row) => {
-  console.log(row)
+const onDeleteArticle = async (row) => {
+  // console.log(row)
+  await ElMessageBox.confirm('你确定删除该文章信息吗？', '温馨提示', {
+    type: 'warning',
+    confirmButtonText: '确认',
+    cancelButtonText: '取消',
+  })
+  await artDelService(row.id)
+  ElMessage.success('删除成功')
+  getArticleList()
+}
+
+// 添加修改成功
+const onSuccess = (type) => {
+  if (type === 'add') {
+    // 如果是'添加'，需要跳转渲染最后一页/编辑直接渲染当前页
+    const lastPage = Math.ceil((total.value + 1) / params.value.pagesize)
+    params.value.pagenum = lastPage
+  }
+  getArticleList()
 }
 
 
@@ -73,16 +100,16 @@ const onDeleteArticle = (row) => {
 <template>
   <page-container title="文章管理">
     <template #extra>
-      <el-button type="primary">发布文章</el-button>
+      <el-button type="primary" @click="onAddArticle">发布文章</el-button>
     </template>
 
     <!-- 主体/表单区域 -->
     <el-form inline>
       <el-form-item label="文章分类：">
-        <channel-select v-model="params.cate_id"></channel-select>
+        <channel-select v-model="params.cate_id" style="width: 200px"></channel-select>
       </el-form-item>
       <el-form-item label="发布状态：">
-        <el-select v-model="params.state" style="width: 240px">
+        <el-select v-model="params.state" style="width: 200px">
           <el-option label="已发布" value="已发布"></el-option>
           <el-option label="草稿" value="草稿"></el-option>
         </el-select>
@@ -96,7 +123,11 @@ const onDeleteArticle = (row) => {
     <el-table :data="articleList" v-loading="loading">
       <el-table-column label="文章标题" prop="title">
         <template #default="{ row }">
-          <el-link type="primary" :underline="false">{{ row.title }}</el-link>
+          <el-link 
+            type="primary" 
+            :underline="false" 
+            @click="onEditArticle(row)"
+          >{{ row.title }}</el-link>
         </template>
       </el-table-column>
       <el-table-column label="分类" prop="cate_name"></el-table-column>
@@ -139,6 +170,9 @@ const onDeleteArticle = (row) => {
       @current-change="onCurrentChange"
       style="margin-top: 20px; justify-content: flex-end;"
     />
+
+    <!-- 添加编辑的抽屉 -->
+    <article-edit ref="articleEditRef" @success="onSuccess"></article-edit>
   </page-container>
 
 </template>
